@@ -24,6 +24,10 @@ namespace Arbor.Processing
         private TaskCompletionSource<ExitCode> _taskCompletionSource;
         private Action<string, string> _toolAction;
         private Action<string, string> _verboseAction;
+        private int? _processId;
+        private string _processWithArgs;
+        private bool _shouldDispose;
+        private bool NeedsCleanup => !_disposed || !_disposing || _process != null || _shouldDispose;
 
         private ProcessRunner()
         {
@@ -41,34 +45,54 @@ namespace Arbor.Processing
             Action<string, string> verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             Action<string, string> debugAction = null,
+            bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrWhiteSpace(executePath))
+            {
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(executePath));
+            }
+
+            if (!File.Exists(executePath))
+            {
+                throw new ArgumentException($"Executable path {executePath} does not exist");
+            }
+
             ExitCode exitCode;
+
             Stopwatch processStopWatch = Stopwatch.StartNew();
 
             string[] args = arguments?.ToArray() ?? Array.Empty<string>();
 
-            using (var runner = new ProcessRunner())
+            try
             {
-                exitCode = await runner.ExecuteAsync(executePath,
-                    args,
-                    standardOutLog,
-                    standardErrorAction,
-                    toolAction,
-                    verboseAction,
-                    environmentVariables,
-                    debugAction,
-                    cancellationToken).ConfigureAwait(false);
+                using (var runner = new ProcessRunner())
+                {
+                    exitCode = await runner.ExecuteAsync(executePath,
+                        args,
+                        standardOutLog,
+                        standardErrorAction,
+                        toolAction,
+                        verboseAction,
+                        environmentVariables,
+                        debugAction,
+                        noWindow,
+                        cancellationToken).ConfigureAwait(false);
 
-                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken)
-                    .ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                processStopWatch.Stop();
+
+                string processWithArgs = $"\"{executePath}\" {string.Join(" ", args.Select(arg => $"\"{arg}\""))}";
+                toolAction?.Invoke(
+                    $"Running process {processWithArgs} took {processStopWatch.Elapsed.TotalMilliseconds:F1} milliseconds",
+                    ProcessRunnerName);
             }
 
-            processStopWatch.Stop();
-            string processWithArgs = $"\"{executePath}\" {string.Join(" ", args.Select(arg => $"\"{arg}\""))}";
-            toolAction?.Invoke(
-                $"Running process {processWithArgs} took {processStopWatch.Elapsed.TotalMilliseconds:F1}",
-                ProcessRunnerName);
 
             return exitCode;
         }
@@ -79,16 +103,20 @@ namespace Arbor.Processing
             {
                 _disposing = true;
 
-                _verboseAction?.Invoke(
-                    $"Task status: {_taskCompletionSource.Task.Status}, {_taskCompletionSource.Task.IsCompleted}",
-                    ProcessRunnerName);
+                if (_verboseAction != null)
+                {
+                    _verboseAction?.Invoke(
+                        $"Task status for process {_processWithArgs}: {_taskCompletionSource.Task.Status}; is completed: {_taskCompletionSource.Task.IsCompleted}",
+                        ProcessRunnerName);
 
-                _verboseAction?.Invoke("Disposing process", ProcessRunnerName);
+                    _verboseAction?.Invoke($"Disposing process {_processWithArgs}", ProcessRunnerName);
+                }
 
                 if (_taskCompletionSource?.Task.CanBeAwaited() == false)
                 {
                     _standardErrorAction?.Invoke("Task completion was not set on dispose, setting to failure",
                         ProcessRunnerName);
+
                     _taskCompletionSource.TrySetResult(ExitCode.Failure);
                 }
 
@@ -98,19 +126,38 @@ namespace Arbor.Processing
 
                 if (_process != null)
                 {
-                    if (!needsDisposeCheck)
+                    try
                     {
-                        _process.Disposed -= OnDisposed;
+                        TryCleanupProcess();
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _verboseAction?.Invoke("Could not get exit status in dispose " + ex, null);
                     }
 
-                    _process.Dispose();
+                    if (!needsDisposeCheck)
+                    {
+                        if (_process != null)
+                        {
+                            _process.Disposed -= OnDisposed;
+                        }
+                    }
+
+                    _process?.Dispose();
 
                     if (needsDisposeCheck)
                     {
-                        _process.Disposed -= OnDisposed;
+                        if (_process != null)
+                        {
+                            _process.Disposed -= OnDisposed;
+                        }
                     }
 
-                    _process.Exited -= OnExited;
+                    if (_process != null)
+                    {
+                        _process.Exited -= OnExited;
+                    }
                 }
 
                 _disposed = true;
@@ -118,6 +165,7 @@ namespace Arbor.Processing
             }
 
             _process = null;
+            _verboseAction?.Invoke($"Dispose completed for process {_processWithArgs}", ProcessRunnerName);
         }
 
         private Task<ExitCode> ExecuteAsync(
@@ -129,6 +177,7 @@ namespace Arbor.Processing
             Action<string, string> verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             Action<string, string> debugAction = null,
+            bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -158,18 +207,18 @@ namespace Arbor.Processing
                 verboseAction,
                 environmentVariables,
                 debugAction,
+                noWindow,
                 cancellationToken);
 
             return task;
         }
 
         private bool IsAlive(
-            string processWithArgs,
             CancellationToken cancellationToken)
         {
             if (CheckedDisposed())
             {
-                _verboseAction?.Invoke($"Process {processWithArgs} does no longer exist", ProcessRunnerName);
+                _verboseAction?.Invoke($"Process {_processWithArgs} does no longer exist", ProcessRunnerName);
                 return false;
             }
 
@@ -195,19 +244,19 @@ namespace Arbor.Processing
             if (_taskCompletionSource.Task.CanBeAwaited())
             {
                 TaskStatus status = _taskCompletionSource.Task.Status;
-                _verboseAction?.Invoke($"Task status for process {processWithArgs} is {status}", ProcessRunnerName);
+                _verboseAction?.Invoke($"Task status for process {_processWithArgs} is: {status}", ProcessRunnerName);
                 return false;
             }
 
             if (cancellationToken.IsCancellationRequested)
             {
-                _verboseAction?.Invoke($"Cancellation is requested for process {processWithArgs}", ProcessRunnerName);
+                _verboseAction?.Invoke($"Cancellation is requested for process {_processWithArgs}", ProcessRunnerName);
                 return false;
             }
 
             if (_exitCode.HasValue)
             {
-                _verboseAction?.Invoke($"Process {processWithArgs} is flagged as done with exit code {_exitCode.Value}",
+                _verboseAction?.Invoke($"Process {_processWithArgs} is flagged as done with exit code {_exitCode.Value}",
                     ProcessRunnerName);
                 return false;
             }
@@ -231,6 +280,7 @@ namespace Arbor.Processing
             Action<string, string> verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             Action<string, string> debugAction = null,
+            bool noWindow=true,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -251,11 +301,11 @@ namespace Arbor.Processing
 
             var executableFile = new FileInfo(executePath);
 
-            string processName = $"[{ProcessRunnerName}][{executableFile.Name}]";
+            string processName = $"{ProcessRunnerName} [{executableFile.Name}]";
 
-            string processWithArgs = $"\"{executePath}\" {formattedArguments}".Trim();
+            _processWithArgs = $"\"{executePath}\" {formattedArguments}".Trim();
 
-            _toolAction?.Invoke($"{ProcessRunnerName} Executing: {processWithArgs}", ProcessRunnerName);
+            _toolAction?.Invoke($"{ProcessRunnerName} Executing: {_processWithArgs}", ProcessRunnerName);
 
             bool useShellExecute = standardErrorAction == null && standardOutputLog == null;
 
@@ -269,7 +319,7 @@ namespace Arbor.Processing
                 RedirectStandardError = redirectStandardError,
                 RedirectStandardOutput = redirectStandardOutput,
                 UseShellExecute = useShellExecute,
-                CreateNoWindow = true
+                CreateNoWindow = noWindow
             };
 
             if (environmentVariables != null)
@@ -308,19 +358,19 @@ namespace Arbor.Processing
 
             _process.EnableRaisingEvents = true;
 
-            int processId = -1;
-
             try
             {
                 bool started = _process.Start();
 
                 if (!started)
                 {
-                    _standardErrorAction?.Invoke($"Process '{processWithArgs}' could not be started", null);
+                    _standardErrorAction?.Invoke($"Process {_processWithArgs} could not be started", null);
 
                     SetFailureResult();
 
-                    return await _taskCompletionSource.Task.ConfigureAwait(false);
+                    await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+
+                    return await _taskCompletionSource.Task;
                 }
 
                 if (redirectStandardError)
@@ -339,11 +389,12 @@ namespace Arbor.Processing
 
                 try
                 {
-                    processId = _process.Id;
+                    _processId = _process.Id;
+                    _processWithArgs = $"{_processWithArgs} id {_processId}";
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _debugAction?.Invoke($"Could not get process id for process '{processWithArgs}'. {ex}", null);
+                    _debugAction?.Invoke($"Could not get process id for process '{_processWithArgs}'. {ex}", null);
                 }
 
                 string temp = _process.HasExited ? "was" : "is";
@@ -351,25 +402,27 @@ namespace Arbor.Processing
                 if (bits.HasValue)
                 {
                     _verboseAction?.Invoke(
-                        $"The process '{processWithArgs}' {temp} running in {bits}-bit mode",
+                        $"The process '{_processWithArgs}' {temp} running in {bits}-bit mode",
                         ProcessRunnerName);
                 }
             }
             catch (Exception ex) when (!ex.IsFatal())
             {
-                _standardErrorAction?.Invoke($"An error occured while running process {processWithArgs}: {ex}",
+                _standardErrorAction?.Invoke($"An error occured while running process {_processWithArgs}: {ex}",
                     ProcessRunnerName);
                 SetResultException(ex);
             }
 
             if (_taskCompletionSource.Task.CanBeAwaited())
             {
-                return await _taskCompletionSource.Task.ConfigureAwait(false);
+                await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+
+                return await _taskCompletionSource.Task;
             }
 
             try
             {
-                while (IsAlive(processWithArgs, cancellationToken))
+                while (IsAlive(cancellationToken))
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
@@ -378,8 +431,11 @@ namespace Arbor.Processing
 
                     Task delay = Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
 
-                    await delay.ConfigureAwait(false);
+                    await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
 
+                    await _taskCompletionSource.Task;
+
+                    await delay;
                     if (_taskCompletionSource.Task.IsCompleted)
                     {
                         _exitCode = await _taskCompletionSource.Task.ConfigureAwait(false);
@@ -398,67 +454,20 @@ namespace Arbor.Processing
             {
                 if (_exitCode?.IsSuccess is null || !_exitCode.Value.IsSuccess)
                 {
-                    if (cancellationToken.IsCancellationRequested)
+                    if (cancellationToken.IsCancellationRequested && NeedsCleanup)
                     {
-                        _process?.Refresh();
-
-                        if (_process?.HasExited == false)
-                        {
-                            try
-                            {
-                                toolAction($"Cancellation is requested, trying to kill process {processWithArgs}",
-                                    ProcessRunnerName);
-
-                                if (processId > 0)
-                                {
-                                    string args = $"/PID {processId}";
-                                    string killProcessPath =
-                                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
-                                            "taskkill.exe");
-                                    toolAction($"Running {killProcessPath} {args}", ProcessRunnerName);
-
-                                    using (Process.Start(killProcessPath, args))
-                                    {
-                                    }
-
-                                    _standardErrorAction?.Invoke(
-                                        $"Killed process {processWithArgs} because cancellation was requested",
-                                        ProcessRunnerName);
-                                }
-                                else
-                                {
-                                    debugAction(
-                                        $"Could not kill process '{processWithArgs}', missing process id",
-                                        ProcessRunnerName);
-                                }
-                            }
-                            catch (Exception ex) when (!ex.IsFatal())
-                            {
-                                _standardErrorAction?.Invoke(
-                                    $"ProcessRunner could not kill process {processWithArgs} when cancellation was requested",
-                                    ProcessRunnerName);
-
-                                _standardErrorAction?.Invoke(
-                                    $"Could not kill process {processWithArgs} when cancellation was requested",
-                                    ProcessRunnerName);
-
-                                _standardErrorAction?.Invoke(ex.ToString(), ProcessRunnerName);
-                            }
-                        }
+                        _shouldDispose = true;
                     }
                 }
             }
 
-            _verboseAction?.Invoke($"Process runner exit code {_exitCode} for process {processWithArgs}",
-                ProcessRunnerName);
-
             try
             {
-                if (processId > 0)
+                if (_processId > 0)
                 {
                     bool stillAlive = false;
 
-                    using (Process stillRunningProcess = Process.GetProcesses().SingleOrDefault(p => p.Id == processId))
+                    using (Process stillRunningProcess = Process.GetProcesses().SingleOrDefault(p => p.Id == _processId))
                     {
                         if (stillRunningProcess != null)
                         {
@@ -472,11 +481,13 @@ namespace Arbor.Processing
                     if (stillAlive)
                     {
                         _verboseAction?.Invoke(
-                            $"The process with ID {processId.ToString(CultureInfo.InvariantCulture)} '{processWithArgs}' is still running",
+                            $"The process with ID {_processId?.ToString(CultureInfo.InvariantCulture)??"N/A"} '{_processWithArgs}' is still running",
                             ProcessRunnerName);
                         SetFailureResult();
 
-                        return await _taskCompletionSource.Task.ConfigureAwait(false);
+                        await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+
+                        await _taskCompletionSource.Task;
                     }
                 }
             }
@@ -485,14 +496,195 @@ namespace Arbor.Processing
                 debugAction($"Could not check processes. {ex}", ProcessRunnerName);
             }
 
-            return await _taskCompletionSource.Task.ConfigureAwait(false);
+            await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+
+            ExitCode result = await _taskCompletionSource.Task;
+
+            _verboseAction?.Invoke($"Process runner exit code {_exitCode} for process {_processWithArgs}",
+                ProcessRunnerName);
+
+            return result;
+        }
+
+        private void TryCleanupProcess()
+        {
+            _verboseAction?.Invoke($"Trying to stop process {_processWithArgs}", ProcessRunnerName);
+
+            if (!NeedsCleanup)
+            {
+                _verboseAction?.Invoke("No cleanup is needed", ProcessRunnerName);
+                return;
+            }
+
+            if (_process is null)
+            {
+                _verboseAction?.Invoke("No cleanup is needed, process is null", ProcessRunnerName);
+                return;
+            }
+
+            try
+            {
+                _process?.Refresh();
+                if (!_exitCode.HasValue)
+                {
+                    _toolAction?.Invoke($"Cancellation is requested, trying to stop process {_processWithArgs}",
+                        ProcessRunnerName);
+
+                    bool forceCloseWithStopProcess = true;
+                    try
+                    {
+                        if (_process?.HasExited == false)
+                        {
+                            _process?.Kill();
+                        }
+
+                        if (_process?.HasExited == true)
+                        {
+                            forceCloseWithStopProcess = false;
+                            _verboseAction?.Invoke($"Successfully stopped process {_processWithArgs}",
+                                ProcessRunnerName);
+                        }
+                        else
+                        {
+                            _verboseAction?.Invoke($"Could not stop process {_processWithArgs}", ProcessRunnerName);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _verboseAction?.Invoke("Got exception, trying taskkill.exe " + ex, ProcessRunnerName);
+                        forceCloseWithStopProcess = true;
+                    }
+
+                    if (forceCloseWithStopProcess)
+                    {
+                        _verboseAction?.Invoke($"Force stopping process {_processWithArgs}", ProcessRunnerName);
+
+                        using (Process foundProcess = Process.GetProcesses().SingleOrDefault(p => p.Id == _processId))
+                        {
+                            if (foundProcess is null)
+                            {
+                                return;
+                            }
+                        }
+
+
+                        if (_processId > 0)
+                        {
+                            string args = $"/PID {_processId}";
+                            string stopProcessPath =
+                                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
+                                    "taskkill.exe");
+
+                            _toolAction?.Invoke($"Running {stopProcessPath} {args}", ProcessRunnerName);
+
+                            using (Process p = Process.Start(stopProcessPath, args))
+                            {
+                                if (p != null)
+                                {
+                                    try
+                                    {
+                                        int waited = 0;
+                                        int maxWait = 5000;
+                                        int waitInterval = 1000;
+
+                                        while (!p.WaitForExit(1000) && waited <= maxWait)
+                                        {
+                                            waited += waitInterval;
+                                            if (p.HasExited)
+                                            {
+                                                _verboseAction?.Invoke("External process stop exit code " + p.ExitCode,
+                                                    ProcessRunnerName);
+
+
+                                                using (Process foundProcess = Process.GetProcesses()
+                                                    .SingleOrDefault(pr => pr.Id == _processId))
+                                                {
+                                                    if (foundProcess is null)
+                                                    {
+
+                                                        _verboseAction?.Invoke($"Process is stopped {_processWithArgs}", ProcessRunnerName);
+                                                    }
+                                                    else
+                                                    {
+                                                        foundProcess.Kill();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (Exception stopEx)
+                                    {
+                                        _verboseAction?.Invoke($"Could not stop process {_processWithArgs} {stopEx}", ProcessRunnerName);
+                                    }
+                                }
+                            }
+
+                            _standardErrorAction?.Invoke(
+                                $"Stopped process {_processWithArgs} because cancellation was requested",
+                                ProcessRunnerName);
+                        }
+                        else
+                        {
+                            _debugAction?.Invoke(
+                                $"Could not stop process '{_processWithArgs}', missing process id",
+                                ProcessRunnerName);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (!ex.IsFatal())
+            {
+                _standardErrorAction?.Invoke(
+                    $"ProcessRunner could not stop process {_processWithArgs} when cancellation was requested",
+                    ProcessRunnerName);
+
+                _standardErrorAction?.Invoke(
+                    $"Could not stop process {_processWithArgs} when cancellation was requested",
+                    ProcessRunnerName);
+
+                _standardErrorAction?.Invoke(ex.ToString(), ProcessRunnerName);
+            }
+            finally
+            {
+                _verboseAction?.Invoke($"Ended process cleanup for process {_processWithArgs}", ProcessRunnerName);
+            }
+        }
+
+        private void DisposeAndStopProcessIfRunning()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_disposing)
+            {
+                return;
+            }
+
+            if (_process is null)
+            {
+                return;
+            }
+
+            _shouldDispose = true;
         }
 
         private void EnsureTaskIsCompleted()
         {
-            if (!CheckedDisposed() && _taskCompletionSource?.Task.CanBeAwaited() == false)
+            try
             {
-                _taskCompletionSource.TrySetCanceled();
+                if (!CheckedDisposed() && _taskCompletionSource?.Task.CanBeAwaited() == false)
+                {
+                    _taskCompletionSource.TrySetCanceled();
+                }
+            }
+            finally
+            {
+                if (NeedsCleanup)
+                {
+                    DisposeAndStopProcessIfRunning();
+                }
             }
         }
 
@@ -512,7 +704,7 @@ namespace Arbor.Processing
 
             proc.EnableRaisingEvents = false;
 
-            if (_taskCompletionSource.Task.CanBeAwaited())
+            if (_taskCompletionSource?.Task.CanBeAwaited() == true)
             {
                 return;
             }
@@ -521,7 +713,7 @@ namespace Arbor.Processing
             int procExitCode;
             try
             {
-                if (_taskCompletionSource.Task.CanBeAwaited())
+                if (_taskCompletionSource?.Task.CanBeAwaited() == true)
                 {
                     return;
                 }
@@ -538,10 +730,10 @@ namespace Arbor.Processing
             }
 
             var result = new ExitCode(procExitCode);
-            _toolAction?.Invoke($"Process '{_process.StartInfo.Arguments}' exited with code {result}",
+            _toolAction?.Invoke($"Process {_processWithArgs} exited with code {result}",
                 ProcessRunnerName);
 
-            if (!_taskCompletionSource.Task.CanBeAwaited())
+            if (_taskCompletionSource?.Task.CanBeAwaited() == false)
             {
                 SetSuccessResult(result);
             }
@@ -601,18 +793,19 @@ namespace Arbor.Processing
         {
             if (!_taskCompletionSource.Task.CanBeAwaited())
             {
-                _verboseAction?.Invoke("Task was not completed, but process was disposed", ProcessRunnerName);
+                _verboseAction?.Invoke($"Task was not completed, but process was disposed {_processWithArgs}", ProcessRunnerName);
                 SetFailureResult();
             }
 
-            _verboseAction?.Invoke("Disposed process", ProcessRunnerName);
+            _verboseAction?.Invoke($"Disposed process {_processWithArgs}", ProcessRunnerName);
         }
 
         private void ThrowIfDisposed()
         {
             if (_disposed)
             {
-                throw new ObjectDisposedException(ProcessRunnerName);
+                throw new ObjectDisposedException(nameof(ProcessRunnerName),
+                    $"Process {_processWithArgs} is already disposed");
             }
         }
 
@@ -620,7 +813,7 @@ namespace Arbor.Processing
         {
             if (_disposed)
             {
-                throw new InvalidOperationException("Disposing in progress");
+                throw new InvalidOperationException($"Disposing in progress for process {_processWithArgs}");
             }
         }
     }

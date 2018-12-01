@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Arbor.Processing
@@ -23,6 +24,11 @@ namespace Arbor.Processing
             }
 
             return task.IsCompleted || task.IsFaulted || task.IsCanceled;
+        }
+
+        public static  Task TimeoutTask(CancellationToken cancellationToken)
+        {
+            return Task.Delay(-1, cancellationToken);
         }
     }
 }
