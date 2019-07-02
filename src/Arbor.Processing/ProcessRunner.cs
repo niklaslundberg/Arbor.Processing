@@ -351,9 +351,9 @@ namespace Arbor.Processing
             {
                 _process.ErrorDataReceived += (_, args) =>
                 {
-                    if (args.Data != null)
+                    if (!string.IsNullOrWhiteSpace(args.Data))
                     {
-                        _standardErrorAction?.Invoke(args.Data, null);
+                        _standardErrorAction?.Invoke(args.Data, processName);
                     }
                 };
             }
@@ -362,7 +362,7 @@ namespace Arbor.Processing
             {
                 _process.OutputDataReceived += (_, args) =>
                 {
-                    if (string.IsNullOrWhiteSpace(args.Data))
+                    if (!string.IsNullOrWhiteSpace(args.Data))
                     {
                         _standardOutLog(args.Data, processName);
                     }
