@@ -36,6 +36,20 @@ namespace Arbor.Processing
                 new TaskCompletionSource<ExitCode>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
+        /// <summary>
+        ///
+        /// </summary>
+        /// <param name="executePath"></param>
+        /// <param name="arguments"></param>
+        /// <param name="standardOutLog">(message, category)</param>
+        /// <param name="standardErrorAction">(message, category)</param>
+        /// <param name="toolAction">(message, category)</param>
+        /// <param name="verboseAction">(message, category)</param>
+        /// <param name="environmentVariables"></param>
+        /// <param name="debugAction"></param>
+        /// <param name="noWindow"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public static async Task<ExitCode> ExecuteProcessAsync(
             string executePath,
             IEnumerable<string> arguments = null,
@@ -129,7 +143,6 @@ namespace Arbor.Processing
                     try
                     {
                         TryCleanupProcess();
-
                     }
                     catch (Exception ex)
                     {
@@ -280,7 +293,7 @@ namespace Arbor.Processing
             Action<string, string> verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             Action<string, string> debugAction = null,
-            bool noWindow=true,
+            bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -305,7 +318,7 @@ namespace Arbor.Processing
 
             _processWithArgs = $"\"{executePath}\" {formattedArguments}".Trim();
 
-            _toolAction?.Invoke($"{ProcessRunnerName} Executing: {_processWithArgs}", ProcessRunnerName);
+            _toolAction?.Invoke($"Executing: {_processWithArgs}", ProcessRunnerName);
 
             bool useShellExecute = standardErrorAction == null && standardOutputLog == null;
 
@@ -349,7 +362,7 @@ namespace Arbor.Processing
             {
                 _process.OutputDataReceived += (_, args) =>
                 {
-                    if (args.Data != null)
+                    if (string.IsNullOrWhiteSpace(args.Data))
                     {
                         _standardOutLog(args.Data, processName);
                     }
@@ -385,7 +398,7 @@ namespace Arbor.Processing
 
                 bool? isWin64 = _process.IsWin64();
 
-                int? bits = isWin64.HasValue ? isWin64.Value ? 64 : 32 : (int?)null;
+                int? bits = isWin64.HasValue ? isWin64.Value ? 64 : 32 : (int?) null;
 
                 try
                 {
@@ -481,7 +494,7 @@ namespace Arbor.Processing
                     if (stillAlive)
                     {
                         _verboseAction?.Invoke(
-                            $"The process with ID {_processId?.ToString(CultureInfo.InvariantCulture)??"N/A"} '{_processWithArgs}' is still running",
+                            $"The process with ID {_processId?.ToString(CultureInfo.InvariantCulture) ?? "N/A"} '{_processWithArgs}' is still running",
                             ProcessRunnerName);
                         SetFailureResult();
 
@@ -601,7 +614,6 @@ namespace Arbor.Processing
                                                 {
                                                     if (foundProcess is null)
                                                     {
-
                                                         _verboseAction?.Invoke($"Process is stopped {_processWithArgs}", ProcessRunnerName);
                                                     }
                                                     else

@@ -7,11 +7,11 @@ using Xunit.Abstractions;
 
 namespace Arbor.Processing.Tests.Integration
 {
-    public class Class1
+    public class ProcessTests
     {
         private readonly ITestOutputHelper _output;
 
-        public Class1(ITestOutputHelper output)
+        public ProcessTests(ITestOutputHelper output)
         {
             _output = output;
         }
@@ -97,14 +97,13 @@ namespace Arbor.Processing.Tests.Integration
 
             for (int i = 0; i < 10; i++)
             {
-                ExitCode? exitCode = null;
+                ExitCode? exitCode;
 
                 using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
                 {
                     exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                         args,
-                        cancellationToken: cts.Token,
-                        noWindow: true);
+                        cancellationToken: cts.Token);
                 }
 
                 Assert.NotNull(exitCode);

@@ -22,7 +22,7 @@ namespace Arbor.Processing
                 {
                     processHandle = Process.GetProcessById(process.Id).Handle;
                 }
-                catch (Exception ex) when(!ex.IsFatal())
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     return false;
                 }
