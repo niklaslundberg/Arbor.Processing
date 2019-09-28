@@ -19,7 +19,7 @@
     <projectUrl>https://github.com/niklaslundberg/Arbor.Processing</projectUrl>
     <iconUrl>https://nuget.org/Content/Images/packageDefaultIcon-50x50.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <licenseUrl>https://github.com/niklaslundberg/Arbor.Processing/blob/master/LICENSE.txt</licenseUrl>
+    <license type="expression">MIT</license>
     <copyright>Copyright Niklas Lundberg 2018</copyright>
 
     <references></references>
