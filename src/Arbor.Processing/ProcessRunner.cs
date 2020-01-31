@@ -12,7 +12,7 @@ namespace Arbor.Processing
     public sealed class ProcessRunner : IDisposable
     {
         private const string ProcessRunnerName = "[" + nameof(ProcessRunner) + "]";
-        private Action<string, string> _debugAction;
+        private Arbor.Processing.CategoryLog _debugAction;
         private bool _disposed;
         private bool _disposing;
 
@@ -21,12 +21,12 @@ namespace Arbor.Processing
         private int? _processId;
         private string _processWithArgs;
         private bool _shouldDispose;
-        private Action<string, string> _standardErrorAction;
+        private Arbor.Processing.CategoryLog _standardErrorAction;
 
-        private Action<string, string> _standardOutLog;
+        private Arbor.Processing.CategoryLog _standardOutLog;
         private TaskCompletionSource<ExitCode> _taskCompletionSource;
-        private Action<string, string> _toolAction;
-        private Action<string, string> _verboseAction;
+        private Arbor.Processing.CategoryLog _toolAction;
+        private Arbor.Processing.CategoryLog _verboseAction;
 
         private ProcessRunner()
         {
@@ -40,12 +40,12 @@ namespace Arbor.Processing
         private Task<ExitCode> ExecuteAsync(
             string executePath,
             IEnumerable<string> arguments = null,
-            Action<string, string> standardOutLog = null,
-            Action<string, string> standardErrorAction = null,
-            Action<string, string> toolAction = null,
-            Action<string, string> verboseAction = null,
+            Arbor.Processing.CategoryLog standardOutLog = null,
+            Arbor.Processing.CategoryLog standardErrorAction = null,
+            Arbor.Processing.CategoryLog toolAction = null,
+            Arbor.Processing.CategoryLog verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
-            Action<string, string> debugAction = null,
+            Arbor.Processing.CategoryLog debugAction = null,
             bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
@@ -143,12 +143,12 @@ namespace Arbor.Processing
         private async Task<ExitCode> RunProcessAsync(
             string executePath,
             string formattedArguments,
-            Action<string, string> standardErrorAction,
-            Action<string, string> standardOutputLog,
-            Action<string, string> toolAction,
-            Action<string, string> verboseAction = null,
+            Arbor.Processing.CategoryLog standardErrorAction,
+            Arbor.Processing.CategoryLog standardOutputLog,
+            Arbor.Processing.CategoryLog toolAction,
+            Arbor.Processing.CategoryLog verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
-            Action<string, string> debugAction = null,
+            Arbor.Processing.CategoryLog debugAction = null,
             bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
@@ -718,12 +718,12 @@ namespace Arbor.Processing
         public static async Task<ExitCode> ExecuteProcessAsync(
             string executePath,
             IEnumerable<string> arguments = null,
-            Action<string, string> standardOutLog = null,
-            Action<string, string> standardErrorAction = null,
-            Action<string, string> toolAction = null,
-            Action<string, string> verboseAction = null,
+            Arbor.Processing.CategoryLog standardOutLog = null,
+            Arbor.Processing.CategoryLog standardErrorAction = null,
+            Arbor.Processing.CategoryLog toolAction = null,
+            Arbor.Processing.CategoryLog verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
-            Action<string, string> debugAction = null,
+            Arbor.Processing.CategoryLog debugAction = null,
             bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
