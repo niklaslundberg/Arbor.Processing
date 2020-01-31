@@ -12,7 +12,7 @@ namespace Arbor.Processing
     public sealed class ProcessRunner : IDisposable
     {
         private const string ProcessRunnerName = "[" + nameof(ProcessRunner) + "]";
-        private Arbor.Processing.CategoryLog _debugAction;
+        private CategoryLog _debugAction;
         private bool _disposed;
         private bool _disposing;
 
@@ -21,12 +21,12 @@ namespace Arbor.Processing
         private int? _processId;
         private string _processWithArgs;
         private bool _shouldDispose;
-        private Arbor.Processing.CategoryLog _standardErrorAction;
+        private CategoryLog _standardErrorAction;
 
-        private Arbor.Processing.CategoryLog _standardOutLog;
+        private CategoryLog _standardOutLog;
         private TaskCompletionSource<ExitCode> _taskCompletionSource;
-        private Arbor.Processing.CategoryLog _toolAction;
-        private Arbor.Processing.CategoryLog _verboseAction;
+        private CategoryLog _toolAction;
+        private CategoryLog _verboseAction;
 
         private ProcessRunner()
         {
@@ -37,15 +37,85 @@ namespace Arbor.Processing
 
         private bool NeedsCleanup => !_disposed || !_disposing || _process != null || _shouldDispose;
 
+        public void Dispose()
+        {
+            if (!_disposed && !_disposing)
+            {
+                _disposing = true;
+
+                if (_verboseAction != null)
+                {
+                    _verboseAction?.Invoke(
+                        $"Task status for process {_processWithArgs}: {_taskCompletionSource.Task.Status}; is completed: {_taskCompletionSource.Task.IsCompleted}",
+                        ProcessRunnerName);
+
+                    _verboseAction?.Invoke($"Disposing process {_processWithArgs}", ProcessRunnerName);
+                }
+
+                if (_taskCompletionSource?.Task.CanBeAwaited() == false)
+                {
+                    _standardErrorAction?.Invoke("Task completion was not set on dispose, setting to failure",
+                        ProcessRunnerName);
+
+                    _taskCompletionSource.TrySetResult(ExitCode.Failure);
+                }
+
+                bool needsDisposeCheck = _taskCompletionSource?.Task.IsCompleted == false;
+
+                _taskCompletionSource = null;
+
+                if (_process != null)
+                {
+                    try
+                    {
+                        TryCleanupProcess();
+                    }
+                    catch (Exception ex)
+                    {
+                        _verboseAction?.Invoke("Could not get exit status in dispose " + ex, null);
+                    }
+
+                    if (!needsDisposeCheck)
+                    {
+                        if (_process != null)
+                        {
+                            _process.Disposed -= OnDisposed;
+                        }
+                    }
+
+                    _process?.Dispose();
+
+                    if (needsDisposeCheck)
+                    {
+                        if (_process != null)
+                        {
+                            _process.Disposed -= OnDisposed;
+                        }
+                    }
+
+                    if (_process != null)
+                    {
+                        _process.Exited -= OnExited;
+                    }
+                }
+
+                _disposed = true;
+                _disposing = false;
+            }
+
+            _process = null;
+            _verboseAction?.Invoke($"Dispose completed for process {_processWithArgs}", ProcessRunnerName);
+        }
+
         private Task<ExitCode> ExecuteAsync(
             string executePath,
             IEnumerable<string> arguments = null,
-            Arbor.Processing.CategoryLog standardOutLog = null,
-            Arbor.Processing.CategoryLog standardErrorAction = null,
-            Arbor.Processing.CategoryLog toolAction = null,
-            Arbor.Processing.CategoryLog verboseAction = null,
+            CategoryLog standardOutLog = null,
+            CategoryLog standardErrorAction = null,
+            CategoryLog toolAction = null,
+            CategoryLog verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
-            Arbor.Processing.CategoryLog debugAction = null,
+            CategoryLog debugAction = null,
             bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
@@ -135,20 +205,17 @@ namespace Arbor.Processing
             return canBeAlive;
         }
 
-        private bool CheckedDisposed()
-        {
-            return _disposed || _disposing;
-        }
+        private bool CheckedDisposed() => _disposed || _disposing;
 
         private async Task<ExitCode> RunProcessAsync(
             string executePath,
             string formattedArguments,
-            Arbor.Processing.CategoryLog standardErrorAction,
-            Arbor.Processing.CategoryLog standardOutputLog,
-            Arbor.Processing.CategoryLog toolAction,
-            Arbor.Processing.CategoryLog verboseAction = null,
+            CategoryLog standardErrorAction,
+            CategoryLog standardOutputLog,
+            CategoryLog toolAction,
+            CategoryLog verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
-            Arbor.Processing.CategoryLog debugAction = null,
+            CategoryLog debugAction = null,
             bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
@@ -266,7 +333,7 @@ namespace Arbor.Processing
 
                 bool? isWin64 = _process.IsWin64();
 
-                int? bits = isWin64.HasValue ? isWin64.Value ? 64 : 32 : (int?) null;
+                int? bits = isWin64.HasValue ? isWin64.Value ? 64 : 32 : (int?)null;
 
                 try
                 {
@@ -718,12 +785,12 @@ namespace Arbor.Processing
         public static async Task<ExitCode> ExecuteProcessAsync(
             string executePath,
             IEnumerable<string> arguments = null,
-            Arbor.Processing.CategoryLog standardOutLog = null,
-            Arbor.Processing.CategoryLog standardErrorAction = null,
-            Arbor.Processing.CategoryLog toolAction = null,
-            Arbor.Processing.CategoryLog verboseAction = null,
+            CategoryLog standardOutLog = null,
+            CategoryLog standardErrorAction = null,
+            CategoryLog toolAction = null,
+            CategoryLog verboseAction = null,
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
-            Arbor.Processing.CategoryLog debugAction = null,
+            CategoryLog debugAction = null,
             bool noWindow = true,
             CancellationToken cancellationToken = default)
         {
@@ -772,76 +839,6 @@ namespace Arbor.Processing
 
 
             return exitCode;
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed && !_disposing)
-            {
-                _disposing = true;
-
-                if (_verboseAction != null)
-                {
-                    _verboseAction?.Invoke(
-                        $"Task status for process {_processWithArgs}: {_taskCompletionSource.Task.Status}; is completed: {_taskCompletionSource.Task.IsCompleted}",
-                        ProcessRunnerName);
-
-                    _verboseAction?.Invoke($"Disposing process {_processWithArgs}", ProcessRunnerName);
-                }
-
-                if (_taskCompletionSource?.Task.CanBeAwaited() == false)
-                {
-                    _standardErrorAction?.Invoke("Task completion was not set on dispose, setting to failure",
-                        ProcessRunnerName);
-
-                    _taskCompletionSource.TrySetResult(ExitCode.Failure);
-                }
-
-                bool needsDisposeCheck = _taskCompletionSource?.Task.IsCompleted == false;
-
-                _taskCompletionSource = null;
-
-                if (_process != null)
-                {
-                    try
-                    {
-                        TryCleanupProcess();
-                    }
-                    catch (Exception ex)
-                    {
-                        _verboseAction?.Invoke("Could not get exit status in dispose " + ex, null);
-                    }
-
-                    if (!needsDisposeCheck)
-                    {
-                        if (_process != null)
-                        {
-                            _process.Disposed -= OnDisposed;
-                        }
-                    }
-
-                    _process?.Dispose();
-
-                    if (needsDisposeCheck)
-                    {
-                        if (_process != null)
-                        {
-                            _process.Disposed -= OnDisposed;
-                        }
-                    }
-
-                    if (_process != null)
-                    {
-                        _process.Exited -= OnExited;
-                    }
-                }
-
-                _disposed = true;
-                _disposing = false;
-            }
-
-            _process = null;
-            _verboseAction?.Invoke($"Dispose completed for process {_processWithArgs}", ProcessRunnerName);
         }
     }
 }

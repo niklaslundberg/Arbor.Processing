@@ -26,9 +26,6 @@ namespace Arbor.Processing
             return task.IsCompleted || task.IsFaulted || task.IsCanceled;
         }
 
-        public static  Task TimeoutTask(CancellationToken cancellationToken)
-        {
-            return Task.Delay(-1, cancellationToken);
-        }
+        public static Task TimeoutTask(CancellationToken cancellationToken) => Task.Delay(-1, cancellationToken);
     }
 }
