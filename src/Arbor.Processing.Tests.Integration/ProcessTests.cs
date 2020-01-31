@@ -99,8 +99,8 @@ namespace Arbor.Processing.Tests.Integration
                     args,
                     cancellationToken: cts.Token,
                     environmentVariables: environmentVariables,
-                    standardOutLog: (s, s1) => _output.WriteLine(s),
-                    toolAction: (s, s1) => _output.WriteLine(s)).ConfigureAwait(false);
+                    standardOutLog: (message, category) => _output.WriteLine(message),
+                    toolAction: (message, category) => _output.WriteLine(message)).ConfigureAwait(false);
             }
 
             Assert.NotNull(exitCode);
