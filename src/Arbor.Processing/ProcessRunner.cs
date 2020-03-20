@@ -117,6 +117,8 @@ namespace Arbor.Processing
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             CategoryLog debugAction = null,
             bool noWindow = true,
+            bool? shellExecute = false,
+            bool? formatArgs = true,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -136,7 +138,9 @@ namespace Arbor.Processing
 
             IEnumerable<string> usedArguments = arguments ?? Enumerable.Empty<string>();
 
-            string formattedArguments = string.Join(" ", usedArguments.Select(arg => $"\"{arg}\""));
+            string[] formattedArguments = formatArgs ?? false
+                ? usedArguments.Select(arg => $"\"{arg}\"").ToArray()
+                : usedArguments.ToArray();
 
             Task<ExitCode> task = RunProcessAsync(executePath,
                 formattedArguments,
@@ -147,6 +151,7 @@ namespace Arbor.Processing
                 environmentVariables,
                 debugAction,
                 noWindow,
+                shellExecute,
                 cancellationToken);
 
             return task;
@@ -209,7 +214,7 @@ namespace Arbor.Processing
 
         private async Task<ExitCode> RunProcessAsync(
             string executePath,
-            string formattedArguments,
+            string[] arguments,
             CategoryLog standardErrorAction,
             CategoryLog standardOutputLog,
             CategoryLog toolAction,
@@ -217,6 +222,7 @@ namespace Arbor.Processing
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             CategoryLog debugAction = null,
             bool noWindow = true,
+            bool? shellExecute = false,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -239,11 +245,13 @@ namespace Arbor.Processing
 
             string processName = $"{ProcessRunnerName} [{executableFile.Name}]";
 
+            string formattedArguments = string.Join(" ", arguments);
+
             _processWithArgs = $"\"{executePath}\" {formattedArguments}".Trim();
 
             _toolAction?.Invoke($"Executing: {_processWithArgs}", ProcessRunnerName);
 
-            bool useShellExecute = standardErrorAction == null && standardOutputLog == null;
+            bool useShellExecute = shellExecute ?? (standardErrorAction == null && standardOutputLog == null);
 
             bool redirectStandardError = standardErrorAction != null;
 
@@ -780,7 +788,9 @@ namespace Arbor.Processing
         /// <param name="environmentVariables"></param>
         /// <param name="debugAction"></param>
         /// <param name="noWindow"></param>
+        /// <param name="formatArgs"></param>
         /// <param name="cancellationToken"></param>
+        /// <param name="shellExecute"></param>
         /// <returns></returns>
         public static async Task<ExitCode> ExecuteProcessAsync(
             string executePath,
@@ -792,6 +802,8 @@ namespace Arbor.Processing
             IEnumerable<KeyValuePair<string, string>> environmentVariables = null,
             CategoryLog debugAction = null,
             bool noWindow = true,
+            bool? shellExecute = false,
+            bool? formatArgs = true,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(executePath))
@@ -813,7 +825,8 @@ namespace Arbor.Processing
             try
             {
                 using var runner = new ProcessRunner();
-                exitCode = await runner.ExecuteAsync(executePath,
+                exitCode = await runner.ExecuteAsync(
+                    executePath,
                     args,
                     standardOutLog,
                     standardErrorAction,
@@ -822,6 +835,8 @@ namespace Arbor.Processing
                     environmentVariables,
                     debugAction,
                     noWindow,
+                    shellExecute,
+                    formatArgs,
                     cancellationToken).ConfigureAwait(false);
 
                 await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken)
