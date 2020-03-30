@@ -119,6 +119,7 @@ namespace Arbor.Processing
             bool noWindow = true,
             bool? shellExecute = false,
             bool? formatArgs = true,
+            DirectoryInfo workingDirectory = null,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -152,6 +153,7 @@ namespace Arbor.Processing
                 debugAction,
                 noWindow,
                 shellExecute,
+                workingDirectory,
                 cancellationToken);
 
             return task;
@@ -223,6 +225,7 @@ namespace Arbor.Processing
             CategoryLog debugAction = null,
             bool noWindow = true,
             bool? shellExecute = false,
+            DirectoryInfo workingDirectory = null,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
@@ -276,6 +279,11 @@ namespace Arbor.Processing
                 UseShellExecute = useShellExecute,
                 CreateNoWindow = noWindow
             };
+
+            if (workingDirectory is { })
+            {
+                processStartInfo.WorkingDirectory = workingDirectory.FullName;
+            }
 
             if (usedEnvironmentVariables.Length > 0)
             {
@@ -804,6 +812,7 @@ namespace Arbor.Processing
             bool noWindow = true,
             bool? shellExecute = false,
             bool? formatArgs = true,
+            DirectoryInfo workingDirectory = null,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(executePath))
@@ -837,6 +846,7 @@ namespace Arbor.Processing
                     noWindow,
                     shellExecute,
                     formatArgs,
+                    workingDirectory,
                     cancellationToken).ConfigureAwait(false);
 
                 await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken)
