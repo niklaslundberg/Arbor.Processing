@@ -13,8 +13,8 @@ namespace Arbor.Processing
                 return default;
             }
 
-            if ((Environment.OSVersion.Version.Major > 5)
-                || ((Environment.OSVersion.Version.Major == 5) && (Environment.OSVersion.Version.Minor >= 1)))
+            if (Environment.OSVersion.Version.Major > 5
+                || (Environment.OSVersion.Version.Major == 5 && Environment.OSVersion.Version.Minor >= 1))
             {
                 IntPtr processHandle;
 
@@ -22,7 +22,7 @@ namespace Arbor.Processing
                 {
                     processHandle = Process.GetProcessById(process.Id).Handle;
                 }
-                catch (Exception ex) when(!ex.IsFatal())
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     return false;
                 }

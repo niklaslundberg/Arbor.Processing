@@ -4,10 +4,7 @@ namespace Arbor.Processing
 {
     public struct ExitCode : IEquatable<ExitCode>
     {
-        public bool Equals(ExitCode other)
-        {
-            return Code == other.Code;
-        }
+        public bool Equals(ExitCode other) => Code == other.Code;
 
         public override bool Equals(object obj)
         {
@@ -19,32 +16,17 @@ namespace Arbor.Processing
             return obj is ExitCode other && Equals(other);
         }
 
-        public override int GetHashCode()
-        {
-            return Code;
-        }
+        public override int GetHashCode() => Code;
 
-        public static bool operator ==(ExitCode left, ExitCode right)
-        {
-            return left.Equals(right);
-        }
+        public static bool operator ==(ExitCode left, ExitCode right) => left.Equals(right);
 
-        public static bool operator !=(ExitCode left, ExitCode right)
-        {
-            return !left.Equals(right);
-        }
+        public static bool operator !=(ExitCode left, ExitCode right) => !left.Equals(right);
 
         public int Code { get; }
 
-        public ExitCode(int code)
-        {
-            Code = code;
-        }
+        public ExitCode(int code) => Code = code;
 
-        public static implicit operator int(ExitCode exitCode)
-        {
-            return exitCode.Code;
-        }
+        public static implicit operator int(ExitCode exitCode) => exitCode.Code;
 
         public override string ToString()
         {
@@ -73,9 +55,6 @@ namespace Arbor.Processing
 
         public bool IsSuccess => Code == 0;
 
-        public int ToInt32()
-        {
-            return Code;
-        }
+        public int ToInt32() => Code;
     }
 }

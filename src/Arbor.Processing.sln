@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.136
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Arbor.Processing", "Arbor.Processing\Arbor.Processing.csproj", "{644A28D6-494A-4362-A8C4-858869BF1497}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arbor.Processing.Tests.Integration", "Arbor.Processing.Tests.Integration\Arbor.Processing.Tests.Integration.csproj", "{0B368AF8-A1C1-4856-883E-89642E83522B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Arbor.Processing.Tests.Integration", "Arbor.Processing.Tests.Integration\Arbor.Processing.Tests.Integration.csproj", "{0B368AF8-A1C1-4856-883E-89642E83522B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{98FAFB18-7159-40BE-A85A-1FC4D7C5A77B}"
 	ProjectSection(SolutionItems) = preProject
@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\.gitattributes = ..\.gitattributes
 		..\.gitignore = ..\.gitignore
 		..\build\build.bat = ..\build\build.bat
+		..\.github\workflows\ci.yml = ..\.github\workflows\ci.yml
 		..\LICENSE.txt = ..\LICENSE.txt
 		..\version.json = ..\version.json
 	EndProjectSection
