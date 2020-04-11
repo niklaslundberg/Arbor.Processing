@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <LangVersion>8</LangVersion>
     <Deterministic>true</Deterministic>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -11,7 +11,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Arbor.Aesculus" Version="3.0.2" />
     <PackageReference Include="microsoft.net.test.sdk" Version="16.5.0" />
+    <PackageReference Include="NCrunch.Framework" Version="4.0.0.1" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.console" Version="2.4.1">
       <PrivateAssets>all</PrivateAssets>
