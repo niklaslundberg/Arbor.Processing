@@ -8,7 +8,7 @@ namespace Arbor.Processing
     {
         public static bool CanBeAwaited(this Task task)
         {
-            if (task == null)
+            if (task is null)
             {
                 throw new ArgumentNullException(nameof(task));
             }
@@ -18,7 +18,7 @@ namespace Arbor.Processing
 
         public static bool CanBeAwaited<T>(this Task<T> task)
         {
-            if (task == null)
+            if (task is null)
             {
                 throw new ArgumentNullException(nameof(task));
             }

@@ -8,12 +8,8 @@ using Xunit.Abstractions;
 
 namespace Arbor.Processing.Tests.Integration
 {
-    public class ProcessTests
+    public class ProcessTests(ITestOutputHelper output)
     {
-        public ProcessTests(ITestOutputHelper output) => _output = output;
-
-        private readonly ITestOutputHelper _output;
-
         [Fact]
         public async Task InfiniteProcessShouldBeCleanedUpOnCancellation()
         {
@@ -21,7 +17,7 @@ namespace Arbor.Processing.Tests.Integration
                 "system32",
                 "ping.exe");
 
-            string[] args = {"127.0.0.1", "-t"};
+            string[] args = ["127.0.0.1", "-t"];
 
             ExitCode? exitCode = null;
 
@@ -30,26 +26,26 @@ namespace Arbor.Processing.Tests.Integration
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                     args,
-                    cancellationToken: cts.Token,
-                    toolAction: (m, c) =>
-                    {
-                        if (!string.IsNullOrWhiteSpace(m))
-                        {
-                            _output.WriteLine(c + " [Tool]: " + m);
-                        }
-                    },
-                    standardErrorAction: (m, c) => _output.WriteLine(c + " [StandardErrorOut]: " + m),
                     standardOutLog: (m, c) =>
                     {
                         if (!string.IsNullOrWhiteSpace(m))
                         {
-                            _output.WriteLine(c + " [StandardOut]: " + m);
+                            output.WriteLine($"{c} [StandardOut]: {m}");
                         }
                     },
-                    verboseAction: (m, c) => _output.WriteLine(c + " [Verbose]: " + m),
-                    debugAction: (m, c) => _output.WriteLine(c + " [Debug]: " + m),
-                    noWindow: false).ConfigureAwait(false);
-            }).ConfigureAwait(false);
+                    standardErrorAction: (m, c) => output.WriteLine(c + " [StandardErrorOut]: " + m),
+                    toolAction: (m, c) =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(m))
+                        {
+                            output.WriteLine($"{c} [Tool]: {m}");
+                        }
+                    },
+                    verboseAction: (m, c) => output.WriteLine(c + " [Verbose]: " + m),
+                    debugAction: (m, c) => output.WriteLine(c + " [Debug]: " + m),
+                    noWindow: false,
+                    cancellationToken: cts.Token);
+            });
 
             Assert.Null(exitCode);
         }
@@ -61,7 +57,7 @@ namespace Arbor.Processing.Tests.Integration
                 "system32",
                 "ping.exe");
 
-            string[] args = {"127.0.0.1", "-t"};
+            string[] args = ["127.0.0.1", "-t"];
 
 
             ExitCode? exitCode = null;
@@ -71,9 +67,9 @@ namespace Arbor.Processing.Tests.Integration
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                     args,
-                    cancellationToken: cts.Token,
-                    noWindow: false).ConfigureAwait(false);
-            }).ConfigureAwait(false);
+                    noWindow: false,
+                    cancellationToken: cts.Token);
+            });
 
             Assert.Null(exitCode);
         }
@@ -85,11 +81,11 @@ namespace Arbor.Processing.Tests.Integration
                 "system32",
                 "ping.exe");
 
-            string parameterName = "Ping_IP";
+            const string parameterName = "Ping_IP";
 
             var environmentVariables = new Dictionary<string, string> {[parameterName] = "127.0.0.1"};
 
-            string[] args = {$"%{parameterName}%"};
+            string[] args = [$"%{parameterName}%"];
 
             ExitCode? exitCode;
 
@@ -97,10 +93,10 @@ namespace Arbor.Processing.Tests.Integration
             {
                 exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                     args,
-                    cancellationToken: cts.Token,
+                    standardOutLog: (message, _) => output.WriteLine(message),
+                    toolAction: (message, _) => output.WriteLine(message),
                     environmentVariables: environmentVariables,
-                    standardOutLog: (message, category) => _output.WriteLine(message),
-                    toolAction: (message, category) => _output.WriteLine(message)).ConfigureAwait(false);
+                    cancellationToken: cts.Token);
             }
 
             Assert.NotNull(exitCode);
@@ -115,7 +111,7 @@ namespace Arbor.Processing.Tests.Integration
                 "system32",
                 "ping.exe");
 
-            string[] args = {"127.0.0.1"};
+            string[] args = ["127.0.0.1"];
 
             for (int i = 0; i < 10; i++)
             {
@@ -123,12 +119,10 @@ namespace Arbor.Processing.Tests.Integration
 
                 using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
                 {
-                    exitCode = await ProcessRunner
-                        .ExecuteProcessAsync(
-                            exePath,
-                            args,
-                            cancellationToken: cts.Token)
-                        .ConfigureAwait(false);
+                    exitCode = await ProcessRunner.ExecuteProcessAsync(
+                        exePath,
+                        args,
+                        cancellationToken: cts.Token);
                 }
 
                 Assert.NotNull(exitCode);

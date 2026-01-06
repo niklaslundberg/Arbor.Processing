@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Xunit;
@@ -7,15 +6,8 @@ using Xunit.Abstractions;
 
 namespace Arbor.Processing.Tests.Integration
 {
-    public class OutTest
+    public class OutTest(ITestOutputHelper testOutputHelper)
     {
-        private readonly ITestOutputHelper _testOutputHelper;
-
-        public OutTest(ITestOutputHelper testOutputHelper)
-        {
-            _testOutputHelper = testOutputHelper;
-        }
-
         [Fact]
         public async Task Output()
         {
@@ -25,7 +17,7 @@ namespace Arbor.Processing.Tests.Integration
                 "Arbor.Processing.Tests.OutputHelper",
                 "bin",
                 "debug",
-                "netcoreapp3.1",
+                "net10.0",
                 "Arbor.Processing.Tests.OutputHelper.exe");
 
             Assert.True(File.Exists(helperExe));
@@ -33,25 +25,19 @@ namespace Arbor.Processing.Tests.Integration
             var list = new List<ulong>();
 
 
-
-            CategoryLog log = (message, category) =>
+            void Log(string message, string _)
             {
                 if (ulong.TryParse(message, out ulong result))
                 {
                     list.Add(result);
                 }
-                else
+                else if (message?.Trim().Length != 1000)
                 {
-                    if (message.Trim().Length != 1000)
-                    {
-                        _testOutputHelper.WriteLine($"Unexpected line length {message.Length}");
-                    }
+                    testOutputHelper.WriteLine($"Unexpected line length {message?.Length}");
                 }
+            }
 
-                //_testOutputHelper.WriteLine(message);
-            };
-
-            await ProcessRunner.ExecuteProcessAsync(helperExe, standardOutLog: log);
+            await ProcessRunner.ExecuteProcessAsync(helperExe, standardOutLog: Log);
 
             Assert.Equal(30000, list.Count);
 

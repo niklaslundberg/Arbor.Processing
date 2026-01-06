@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Arbor.Processing.Tests.OutputHelper
 {
-    internal class Program
+    internal static class Program
     {
         private static void Main(string[] args)
         {

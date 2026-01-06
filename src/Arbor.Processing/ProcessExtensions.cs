@@ -10,7 +10,7 @@ namespace Arbor.Processing
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                return default;
+                return null;
             }
 
             if (Environment.OSVersion.Version.Major > 5
