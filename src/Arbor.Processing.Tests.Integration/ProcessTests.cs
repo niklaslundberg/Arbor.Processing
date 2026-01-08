@@ -4,136 +4,128 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
-namespace Arbor.Processing.Tests.Integration
+namespace Arbor.Processing.Tests.Integration;
+
+public class ProcessTests(ITestOutputHelper output)
 {
-    public class ProcessTests
+    [Fact]
+    public async Task InfiniteProcessShouldBeCleanedUpOnCancellation()
     {
-        public ProcessTests(ITestOutputHelper output) => _output = output;
+        string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "system32",
+            "ping.exe");
 
-        private readonly ITestOutputHelper _output;
+        string[] args = ["127.0.0.1", "-t"];
 
-        [Fact]
-        public async Task InfiniteProcessShouldBeCleanedUpOnCancellation()
+        ExitCode? exitCode = null;
+
+        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
         {
-            string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                "system32",
-                "ping.exe");
-
-            string[] args = {"127.0.0.1", "-t"};
-
-            ExitCode? exitCode = null;
-
-            await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
-                    args,
-                    cancellationToken: cts.Token,
-                    toolAction: (m, c) =>
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
+                args,
+                standardOutLog: (m, c) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(m))
                     {
-                        if (!string.IsNullOrWhiteSpace(m))
-                        {
-                            _output.WriteLine(c + " [Tool]: " + m);
-                        }
-                    },
-                    standardErrorAction: (m, c) => _output.WriteLine(c + " [StandardErrorOut]: " + m),
-                    standardOutLog: (m, c) =>
+                        output.WriteLine($"{c} [StandardOut]: {m}");
+                    }
+                },
+                standardErrorAction: (m, c) => output.WriteLine(c + " [StandardErrorOut]: " + m),
+                toolAction: (m, c) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(m))
                     {
-                        if (!string.IsNullOrWhiteSpace(m))
-                        {
-                            _output.WriteLine(c + " [StandardOut]: " + m);
-                        }
-                    },
-                    verboseAction: (m, c) => _output.WriteLine(c + " [Verbose]: " + m),
-                    debugAction: (m, c) => _output.WriteLine(c + " [Debug]: " + m),
-                    noWindow: false).ConfigureAwait(false);
-            }).ConfigureAwait(false);
+                        output.WriteLine($"{c} [Tool]: {m}");
+                    }
+                },
+                verboseAction: (m, c) => output.WriteLine(c + " [Verbose]: " + m),
+                debugAction: (m, c) => output.WriteLine(c + " [Debug]: " + m),
+                noWindow: false,
+                cancellationToken: cts.Token);
+        });
 
-            Assert.Null(exitCode);
+        Assert.Null(exitCode);
+    }
+
+    [Fact]
+    public async Task InfiniteProcessShouldBeCleanedUpOnCancellationWithoutLogging()
+    {
+        string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "system32",
+            "ping.exe");
+
+        string[] args = ["127.0.0.1", "-t"];
+
+
+        ExitCode? exitCode = null;
+
+        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
+                args,
+                noWindow: false,
+                cancellationToken: cts.Token);
+        });
+
+        Assert.Null(exitCode);
+    }
+
+    [Fact]
+    public async Task ProcessPassingEnvironmentVariables()
+    {
+        string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "system32",
+            "ping.exe");
+
+        const string parameterName = "Ping_IP";
+
+        var environmentVariables = new Dictionary<string, string> {[parameterName] = "127.0.0.1"};
+
+        string[] args = [$"%{parameterName}%"];
+
+        ExitCode? exitCode;
+
+        using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
+                args,
+                standardOutLog: (message, _) => output.WriteLine(message),
+                toolAction: (message, _) => output.WriteLine(message),
+                environmentVariables: environmentVariables,
+                cancellationToken: cts.Token);
         }
 
-        [Fact]
-        public async Task InfiniteProcessShouldBeCleanedUpOnCancellationWithoutLogging()
+        Assert.NotNull(exitCode);
+        Assert.Equal(0, exitCode.Value);
+    }
+
+
+    [Fact]
+    public async Task ProcessShouldBeCleanedUpOnExitSuccessful()
+    {
+        string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "system32",
+            "ping.exe");
+
+        string[] args = ["127.0.0.1"];
+
+        for (int i = 0; i < 10; i++)
         {
-            string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                "system32",
-                "ping.exe");
-
-            string[] args = {"127.0.0.1", "-t"};
-
-
-            ExitCode? exitCode = null;
-
-            await Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
-                    args,
-                    cancellationToken: cts.Token,
-                    noWindow: false).ConfigureAwait(false);
-            }).ConfigureAwait(false);
-
-            Assert.Null(exitCode);
-        }
-
-        [Fact]
-        public async Task ProcessPassingEnvironmentVariables()
-        {
-            string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                "system32",
-                "ping.exe");
-
-            string parameterName = "Ping_IP";
-
-            var environmentVariables = new Dictionary<string, string> {[parameterName] = "127.0.0.1"};
-
-            string[] args = {$"%{parameterName}%"};
-
             ExitCode? exitCode;
 
             using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
             {
-                exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
+                exitCode = await ProcessRunner.ExecuteProcessAsync(
+                    exePath,
                     args,
-                    cancellationToken: cts.Token,
-                    environmentVariables: environmentVariables,
-                    standardOutLog: (message, category) => _output.WriteLine(message),
-                    toolAction: (message, category) => _output.WriteLine(message)).ConfigureAwait(false);
+                    cancellationToken: cts.Token);
             }
 
             Assert.NotNull(exitCode);
             Assert.Equal(0, exitCode.Value);
-        }
-
-
-        [Fact]
-        public async Task ProcessShouldBeCleanedUpOnExitSuccessful()
-        {
-            string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                "system32",
-                "ping.exe");
-
-            string[] args = {"127.0.0.1"};
-
-            for (int i = 0; i < 10; i++)
-            {
-                ExitCode? exitCode;
-
-                using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
-                {
-                    exitCode = await ProcessRunner
-                        .ExecuteProcessAsync(
-                            exePath,
-                            args,
-                            cancellationToken: cts.Token)
-                        .ConfigureAwait(false);
-                }
-
-                Assert.NotNull(exitCode);
-                Assert.Equal(0, exitCode.Value);
-            }
         }
     }
 }
