@@ -10,12 +10,18 @@ public class OutTest(ITestOutputHelper testOutputHelper)
     [Fact]
     public async Task Output()
     {
+#if DEBUG
+        const string configuration = "debug";
+#else
+            const string configuration = "release";
+#endif
+
         string helperExe = Path.Combine(
             VcsTestPathHelper.FindVcsRootPath(),
             "src",
             "Arbor.Processing.Tests.OutputHelper",
             "bin",
-            "debug",
+            configuration,
             "net10.0",
             "Arbor.Processing.Tests.OutputHelper.exe");
 
