@@ -21,7 +21,7 @@ public class ProcessTests(ITestOutputHelper output)
 
         ExitCode? exitCode = null;
 
-        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+        Func<Task> act = async () =>
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
@@ -45,7 +45,8 @@ public class ProcessTests(ITestOutputHelper output)
                 debugAction: (m, c) => output.WriteLine(c + " [Debug]: " + m),
                 noWindow: false,
                 cancellationToken: cts.Token);
-        });
+        };
+        await act.Should().ThrowAsync<TaskCanceledException>();
 
         exitCode.Should().BeNull();
     }
@@ -100,8 +101,8 @@ public class ProcessTests(ITestOutputHelper output)
                 cancellationToken: cts.Token);
         }
 
-        Assert.NotNull(exitCode);
-        Assert.Equal(0, exitCode.Value);
+        exitCode.Should().NotBeNull();
+        exitCode.Value.Code.Should().Be(0);
     }
 
 
@@ -126,8 +127,8 @@ public class ProcessTests(ITestOutputHelper output)
                     cancellationToken: cts.Token);
             }
 
-            Assert.NotNull(exitCode);
-            Assert.Equal(0, exitCode.Value);
+            exitCode.Should().NotBeNull();
+            exitCode.Value.Code.Should().Be(0);
         }
     }
 }

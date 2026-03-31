@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Arbor.Processing;
@@ -27,6 +28,10 @@ public sealed class ProcessRunner : IDisposable
     private TaskCompletionSource<ExitCode>? _taskCompletionSource;
     private CategoryLog? _toolAction;
     private CategoryLog? _verboseAction;
+    private Channel<string>? _outputChannel;
+    private Task? _outputConsumerTask;
+    private Channel<string>? _errorChannel;
+    private Task? _errorConsumerTask;
 
     private ProcessRunner()
     {
@@ -42,6 +47,9 @@ public sealed class ProcessRunner : IDisposable
         if (!_disposed && !_disposing)
         {
             _disposing = true;
+
+            _outputChannel?.Writer.TryComplete();
+            _errorChannel?.Writer.TryComplete();
 
             if (_verboseAction is { } && _taskCompletionSource is { })
             {
@@ -351,13 +359,9 @@ public sealed class ProcessRunner : IDisposable
                    && !cancellationToken.IsCancellationRequested
                    && _taskCompletionSource is { })
             {
-                var delay = Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
-
                 await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
 
                 await _taskCompletionSource.Task;
-
-                await delay;
 
                 await SetExitCode();
             }
@@ -378,13 +382,14 @@ public sealed class ProcessRunner : IDisposable
             {
                 bool stillAlive = false;
 
-                using (Process? stillRunningProcess =
-                       Process.GetProcesses().SingleOrDefault(p => p.Id == _processId))
+                try
                 {
-                    if (stillRunningProcess is { HasExited: false })
-                    {
-                        stillAlive = true;
-                    }
+                    using Process stillRunningProcess = Process.GetProcessById(_processId.Value);
+                    stillAlive = !stillRunningProcess.HasExited;
+                }
+                catch (ArgumentException)
+                {
+                    // Process no longer exists
                 }
 
                 if (stillAlive && _taskCompletionSource is { })
@@ -413,6 +418,16 @@ public sealed class ProcessRunner : IDisposable
         await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
 
         ExitCode result = await _taskCompletionSource.Task;
+
+        if (_outputConsumerTask is { })
+        {
+            await _outputConsumerTask.ConfigureAwait(false);
+        }
+
+        if (_errorConsumerTask is { })
+        {
+            await _errorConsumerTask.ConfigureAwait(false);
+        }
 
         _verboseAction?.Invoke($"Process runner exit code {_exitCode} for process {_processWithArgs}",
             ProcessRunnerName);
@@ -450,18 +465,39 @@ public sealed class ProcessRunner : IDisposable
             return;
         }
 
+        _outputChannel = Channel.CreateUnbounded<string>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+
+        CategoryLog log = _standardOutLog;
+        ChannelWriter<string> writer = _outputChannel.Writer;
+
         _process.OutputDataReceived += (_, args) =>
         {
+            if (args.Data is null)
+            {
+                writer.TryComplete();
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(args.Data))
             {
-                _standardOutLog(args.Data, processName);
+                writer.TryWrite(args.Data);
             }
         };
+
+        ChannelReader<string> reader = _outputChannel.Reader;
+        _outputConsumerTask = Task.Run(async () =>
+        {
+            await foreach (string line in reader.ReadAllAsync().ConfigureAwait(false))
+            {
+                log(line, processName);
+            }
+        });
     }
 
     private void SetupStandardErrorRedirect(bool redirectStandardError, string processName)
     {
-        if (!redirectStandardError)
+        if (!redirectStandardError || _standardErrorAction is null)
         {
             return;
         }
@@ -471,13 +507,34 @@ public sealed class ProcessRunner : IDisposable
             return;
         }
 
+        _errorChannel = Channel.CreateUnbounded<string>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+
+        CategoryLog log = _standardErrorAction;
+        ChannelWriter<string> writer = _errorChannel.Writer;
+
         _process.ErrorDataReceived += (_, args) =>
         {
+            if (args.Data is null)
+            {
+                writer.TryComplete();
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(args.Data))
             {
-                _standardErrorAction?.Invoke(args.Data, processName);
+                writer.TryWrite(args.Data);
             }
         };
+
+        ChannelReader<string> reader = _errorChannel.Reader;
+        _errorConsumerTask = Task.Run(async () =>
+        {
+            await foreach (string line in reader.ReadAllAsync().ConfigureAwait(false))
+            {
+                log(line, processName);
+            }
+        });
     }
 
     private async Task SetExitCode()
@@ -936,8 +993,6 @@ public sealed class ProcessRunner : IDisposable
                 formatArgs,
                 workingDirectory,
                 cancellationToken);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
         }
         finally
         {
