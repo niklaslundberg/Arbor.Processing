@@ -10,7 +10,7 @@ internal static class VcsTestPathHelper
     {
         if (NCrunchEnvironment.NCrunchIsResident())
         {
-            var solutionDir = new FileInfo(NCrunchEnvironment.GetOriginalSolutionPath())?.Directory;
+            var solutionDir = new FileInfo(NCrunchEnvironment.GetOriginalSolutionPath()).Directory;
             return VcsPathHelper.FindVcsRootPath(solutionDir?.FullName);
         }
 

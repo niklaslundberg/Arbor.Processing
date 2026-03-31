@@ -8,20 +8,28 @@ internal static class TaskExtensions
 {
     public static bool CanBeAwaited(this Task task)
     {
+#if NET6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(task);
+#else
         if (task is null)
         {
             throw new ArgumentNullException(nameof(task));
         }
+#endif
 
         return task.IsCompleted || task.IsFaulted || task.IsCanceled;
     }
 
     public static bool CanBeAwaited<T>(this Task<T> task)
     {
+#if NET6_0_OR_GREATER
+        ArgumentNullException.ThrowIfNull(task);
+#else
         if (task is null)
         {
             throw new ArgumentNullException(nameof(task));
         }
+#endif
 
         return task.IsCompleted || task.IsFaulted || task.IsCanceled;
     }

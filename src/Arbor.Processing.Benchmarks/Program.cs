@@ -2,9 +2,9 @@ using BenchmarkDotNet.Running;
 
 namespace Arbor.Processing.Benchmarks
 {
-    internal class Program
+    internal sealed class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             var _ = BenchmarkRunner.Run(typeof(Program).Assembly);
         }

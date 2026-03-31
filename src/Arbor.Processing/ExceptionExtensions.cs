@@ -6,18 +6,11 @@ namespace Arbor.Processing;
 
 internal static class ExceptionExtensions
 {
-    public static bool IsFatal(this Exception? ex)
-    {
-        if (ex is null)
-        {
-            return false;
-        }
-
-        return ex is OutOfMemoryException
-               || ex is AccessViolationException
-               || ex is AppDomainUnloadedException
-               || ex is StackOverflowException
-               || ex is ThreadAbortException
-               || ex is SEHException;
-    }
+    public static bool IsFatal(this Exception? ex) =>
+        ex is OutOfMemoryException
+            or AccessViolationException
+            or AppDomainUnloadedException
+            or StackOverflowException
+            or ThreadAbortException
+            or SEHException;
 }

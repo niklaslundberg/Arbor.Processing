@@ -51,7 +51,7 @@ public sealed class ProcessRunner : IDisposable
             _outputChannel?.Writer.TryComplete();
             _errorChannel?.Writer.TryComplete();
 
-            if (_verboseAction is { } && _taskCompletionSource is { })
+            if (_taskCompletionSource is { })
             {
                 _verboseAction?.Invoke(
                     $"Task status for process {_processWithArgs}: {_taskCompletionSource.Task.Status}; is completed: {_taskCompletionSource.Task.IsCompleted}",
@@ -86,6 +86,7 @@ public sealed class ProcessRunner : IDisposable
     {
         if (_process is { })
         {
+            #pragma warning disable CA1031
             try
             {
                 TryCleanupProcess();
@@ -94,6 +95,7 @@ public sealed class ProcessRunner : IDisposable
             {
                 _verboseAction?.Invoke("Could not get exit status in dispose " + ex, null);
             }
+#pragma warning restore CA1031
 
             if (!needsDisposeCheck && _process is { })
             {
@@ -303,9 +305,9 @@ public sealed class ProcessRunner : IDisposable
 
                 SetFailureResult();
 
-                await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+                await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken)).ConfigureAwait(false);
 
-                return await _taskCompletionSource.Task;
+                return await _taskCompletionSource.Task.ConfigureAwait(false);
             }
 
             if (redirectStandardError)
@@ -348,9 +350,9 @@ public sealed class ProcessRunner : IDisposable
 
         if (_taskCompletionSource is { } && _taskCompletionSource.Task.CanBeAwaited())
         {
-            await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+            await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken)).ConfigureAwait(false);
 
-            return await _taskCompletionSource.Task;
+            return await _taskCompletionSource.Task.ConfigureAwait(false);
         }
 
         try
@@ -359,11 +361,11 @@ public sealed class ProcessRunner : IDisposable
                    && !cancellationToken.IsCancellationRequested
                    && _taskCompletionSource is { })
             {
-                await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+                await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken)).ConfigureAwait(false);
 
-                await _taskCompletionSource.Task;
+                await _taskCompletionSource.Task.ConfigureAwait(false);
 
-                await SetExitCode();
+                await SetExitCode().ConfigureAwait(false);
             }
         }
         finally
@@ -384,7 +386,7 @@ public sealed class ProcessRunner : IDisposable
 
                 try
                 {
-                    using Process stillRunningProcess = Process.GetProcessById(_processId.Value);
+                    using var stillRunningProcess = Process.GetProcessById(_processId.Value);
                     stillAlive = !stillRunningProcess.HasExited;
                 }
                 catch (ArgumentException)
@@ -399,9 +401,9 @@ public sealed class ProcessRunner : IDisposable
                         ProcessRunnerName);
                     SetFailureResult();
 
-                    await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+                    await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken)).ConfigureAwait(false);
 
-                    await _taskCompletionSource.Task;
+                    await _taskCompletionSource.Task.ConfigureAwait(false);
                 }
             }
         }
@@ -415,9 +417,9 @@ public sealed class ProcessRunner : IDisposable
             throw new InvalidOperationException("Task completion source is null");
         }
 
-        await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken));
+        await Task.WhenAny(_taskCompletionSource.Task, TaskExtensions.TimeoutTask(cancellationToken)).ConfigureAwait(false);
 
-        ExitCode result = await _taskCompletionSource.Task;
+        var result = await _taskCompletionSource.Task.ConfigureAwait(false);
 
         if (_outputConsumerTask is { })
         {
@@ -548,7 +550,7 @@ public sealed class ProcessRunner : IDisposable
             _taskCompletionSource.Task.IsCanceled ||
             _taskCompletionSource.Task.IsFaulted)
         {
-            _exitCode = await _taskCompletionSource.Task;
+            _exitCode = await _taskCompletionSource.Task.ConfigureAwait(false);
         }
     }
 
@@ -575,7 +577,11 @@ public sealed class ProcessRunner : IDisposable
 
         foreach (KeyValuePair<string, string> pair in usedEnvironmentVariables)
         {
+#if NETSTANDARD2_0
             formattedArguments = formattedArguments.Replace($"%{pair.Key}%", pair.Value);
+#else
+            formattedArguments = formattedArguments.Replace($"%{pair.Key}%", pair.Value, StringComparison.Ordinal);
+#endif
         }
 
         return formattedArguments;
@@ -641,11 +647,13 @@ public sealed class ProcessRunner : IDisposable
                         _verboseAction?.Invoke($"Could not stop process {_processWithArgs}", ProcessRunnerName);
                     }
                 }
+                #pragma warning disable CA1031
                 catch (Exception ex)
                 {
                     _verboseAction?.Invoke($"Got exception, trying taskkill.exe {ex}", ProcessRunnerName);
                     forceCloseWithStopProcess = true;
                 }
+#pragma warning restore CA1031
 
                 if (forceCloseWithStopProcess)
                 {
@@ -736,11 +744,13 @@ public sealed class ProcessRunner : IDisposable
                         }
                     }
                 }
+                #pragma warning disable CA1031
                 catch (Exception stopEx)
                 {
                     _verboseAction?.Invoke($"Could not stop process {_processWithArgs} {stopEx}",
                         ProcessRunnerName);
                 }
+#pragma warning restore CA1031
             }
         }
 
@@ -992,7 +1002,7 @@ public sealed class ProcessRunner : IDisposable
                 shellExecute,
                 formatArgs,
                 workingDirectory,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {

@@ -6,6 +6,7 @@ namespace Arbor.Processing;
 internal static class NativeMethods
 {
     [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool IsWow64Process([In] IntPtr process, [Out] out bool wow64Process);
 }

@@ -44,7 +44,7 @@ public class ProcessTests(ITestOutputHelper output)
                 verboseAction: (m, c) => output.WriteLine(c + " [Verbose]: " + m),
                 debugAction: (m, c) => output.WriteLine(c + " [Debug]: " + m),
                 noWindow: false,
-                cancellationToken: cts.Token);
+                cancellationToken: cts.Token).ConfigureAwait(false);
         };
         await act.Should().ThrowAsync<TaskCanceledException>();
 
@@ -69,7 +69,7 @@ public class ProcessTests(ITestOutputHelper output)
             exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                 args,
                 noWindow: false,
-                cancellationToken: cts.Token);
+                cancellationToken: cts.Token).ConfigureAwait(false);
         };
 
         await action.Should().ThrowAsync<TaskCanceledException>();
