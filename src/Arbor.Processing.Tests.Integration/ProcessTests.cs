@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using AwesomeAssertions;
 using Xunit;
 
 namespace Arbor.Processing.Tests.Integration;
@@ -46,7 +47,7 @@ public class ProcessTests(ITestOutputHelper output)
                 cancellationToken: cts.Token);
         });
 
-        Assert.Null(exitCode);
+        exitCode.Should().BeNull();
     }
 
     [Fact]
@@ -61,16 +62,17 @@ public class ProcessTests(ITestOutputHelper output)
 
         ExitCode? exitCode = null;
 
-        await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+        var action = async () =>
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                 args,
                 noWindow: false,
                 cancellationToken: cts.Token);
-        });
+        };
 
-        Assert.Null(exitCode);
+        await action.Should().ThrowAsync<TaskCanceledException>();
+        exitCode.Should().BeNull();
     }
 
     [Fact]

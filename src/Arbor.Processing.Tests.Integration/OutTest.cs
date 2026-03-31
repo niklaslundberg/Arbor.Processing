@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using AwesomeAssertions;
 using Xunit;
 
 namespace Arbor.Processing.Tests.Integration;
@@ -43,14 +44,14 @@ public class OutTest(ITestOutputHelper testOutputHelper)
 
         await ProcessRunner.ExecuteProcessAsync(helperExe, standardOutLog: Log, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.Equal(30000, list.Count);
+        list.Should().HaveCount(30_000);
 
         for (int i = 0; i < list.Count; i++)
         {
             if (i > 0)
             {
-                Assert.True(list[i] > list[i - 1]);
-                Assert.True(list[i] - list[i - 1] == 1);
+                (list[i] > list[i - 1]).Should().BeTrue();
+                (list[i] - list[i - 1] == 1).Should().BeTrue();
             }
         }
     }
