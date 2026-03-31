@@ -1,4 +1,4 @@
-﻿using Arbor;
+using Arbor;
 using Arbor.Processing;
 using AwesomeAssertions;
 using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
@@ -30,7 +30,7 @@ public sealed partial class ProcessRunnerTests
     /// Tests that ProcessRunner properly disposes resources when a process completes successfully.
     /// This verifies that Dispose is called and completes without error after normal execution.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task Dispose_WhenProcessCompletesSuccessfully_DisposesWithoutError()
     {
         // Arrange
@@ -45,7 +45,7 @@ public sealed partial class ProcessRunnerTests
         }, standardErrorAction: (m, c) =>
         {
             standardErrorCalled = true;
-        }, cancellationToken: TestContext.Current.CancellationToken);
+        }, formatArgs: false, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         result.Should().Be(ExitCode.Success);
         verboseLogCalled.Should().BeTrue();
@@ -55,7 +55,7 @@ public sealed partial class ProcessRunnerTests
     /// Tests that ProcessRunner properly handles disposal when cancelled.
     /// This verifies the Dispose method handles incomplete task completion sources correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task Dispose_WhenProcessIsCancelled_HandlesIncompleteTaskGracefully()
     {
         // Arrange
@@ -131,7 +131,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that Dispose invokes verbose logging callbacks with appropriate messages.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task Dispose_WhenVerboseActionProvided_InvokesLoggingCallbacks()
     {
         // Arrange
@@ -148,7 +148,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that Dispose handles process cleanup when process exits with non-zero exit code.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task Dispose_WhenProcessExitsWithFailure_DisposesCorrectly()
     {
         // Arrange
@@ -168,7 +168,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync throws ArgumentException when executePath is null.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_NullExecutePath_ThrowsArgumentException()
     {
         // Arrange
@@ -182,7 +182,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync throws ArgumentException when executePath is empty.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_EmptyExecutePath_ThrowsArgumentException()
     {
         // Arrange
@@ -196,7 +196,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync throws ArgumentException when executePath is whitespace.
     /// </summary>
-    [Theory]
+    [Theory(Timeout = 10_000)]
     [InlineData(" ")]
     [InlineData("  ")]
     [InlineData("\t")]
@@ -214,7 +214,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync throws ArgumentException for invalid path characters.
     /// </summary>
-    [Theory]
+    [Theory(Timeout = 10_000)]
     [InlineData("C:\\invalid<path>.exe")]
     [InlineData("C:\\invalid>path.exe")]
     [InlineData("C:\\invalid|path.exe")]
@@ -231,11 +231,11 @@ public sealed partial class ProcessRunnerTests
     /// Tests that ExecuteProcessAsync handles null arguments gracefully.
     /// Uses a real executable to test actual execution.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_NullArguments_ExecutesSuccessfully()
     {
-        // Arrange
-        string exePath = GetSystemExecutable();
+        // Arrange - use whoami.exe which exits immediately without arguments
+        string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "whoami.exe");
         IEnumerable<string> arguments = null!;
         // Act
         ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: arguments, cancellationToken: TestContext.Current.CancellationToken);
@@ -246,11 +246,11 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles empty arguments collection.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_EmptyArguments_ExecutesSuccessfully()
     {
-        // Arrange
-        string exePath = GetSystemExecutable();
+        // Arrange - use whoami.exe which exits immediately without arguments
+        string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "whoami.exe");
         IEnumerable<string> arguments = Array.Empty<string>();
         // Act
         ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: arguments, cancellationToken: TestContext.Current.CancellationToken);
@@ -261,7 +261,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync passes arguments to the process.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithArguments_PassesArgumentsToProcess()
     {
         // Arrange
@@ -276,7 +276,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync invokes standardOutLog delegate when provided.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithStandardOutLog_InvokesDelegate()
     {
         // Arrange
@@ -289,8 +289,8 @@ public sealed partial class ProcessRunnerTests
             messages.Add(message);
         }
 
-        // Act
-        await ProcessRunner.ExecuteProcessAsync(exePath, standardOutLog: StandardOutLog, cancellationToken: TestContext.Current.CancellationToken);
+        // Act - use "echo hello" so cmd.exe produces stdout output
+        await ProcessRunner.ExecuteProcessAsync(exePath, arguments: ["/c", "echo", "hello"], standardOutLog: StandardOutLog, formatArgs: false, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         delegateInvoked.Should().BeTrue();
     }
@@ -298,7 +298,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync invokes toolAction delegate in finally block with timing information.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithToolAction_InvokesDelegateWithTimingInfo()
     {
         // Arrange
@@ -312,7 +312,7 @@ public sealed partial class ProcessRunnerTests
         }
 
         // Act
-        await ProcessRunner.ExecuteProcessAsync(exePath, toolAction: ToolAction, cancellationToken: TestContext.Current.CancellationToken);
+        await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), toolAction: ToolAction, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         delegateInvoked.Should().BeTrue();
         loggedMessage.Should().NotBeNull();
@@ -323,14 +323,14 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles null environment variables.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_NullEnvironmentVariables_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         IEnumerable<KeyValuePair<string, string>> environmentVariables = null!;
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, environmentVariables: environmentVariables, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), environmentVariables: environmentVariables, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -338,14 +338,14 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles empty environment variables collection.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_EmptyEnvironmentVariables_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         var environmentVariables = Array.Empty<KeyValuePair<string, string>>();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, environmentVariables: environmentVariables, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), environmentVariables: environmentVariables, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -353,7 +353,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles non-empty environment variables collection.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithEnvironmentVariables_ExecutesSuccessfully()
     {
         // Arrange
@@ -364,7 +364,7 @@ public sealed partial class ProcessRunnerTests
             new KeyValuePair<string, string>("TEST_VAR2", "value2")
         };
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, environmentVariables: environmentVariables, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), environmentVariables: environmentVariables, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -372,13 +372,13 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync respects noWindow parameter when true.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_NoWindowTrue_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, noWindow: true, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), noWindow: true, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -386,13 +386,13 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync respects noWindow parameter when false.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_NoWindowFalse_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, noWindow: false, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), noWindow: false, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -400,7 +400,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles shellExecute parameter.
     /// </summary>
-    [Theory]
+    [Theory(Timeout = 10_000)]
     [InlineData(null)]
     [InlineData(false)]
     [InlineData(true)]
@@ -409,7 +409,7 @@ public sealed partial class ProcessRunnerTests
         // Arrange
         string exePath = GetSystemExecutable();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, shellExecute: shellExecute, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), shellExecute: shellExecute, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -417,7 +417,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles formatArgs parameter.
     /// </summary>
-    [Theory]
+    [Theory(Timeout = 10_000)]
     [InlineData(null)]
     [InlineData(false)]
     [InlineData(true)]
@@ -435,14 +435,14 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles null working directory.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_NullWorkingDirectory_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         DirectoryInfo workingDirectory = null!;
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, workingDirectory: workingDirectory, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), workingDirectory: workingDirectory, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -450,14 +450,14 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles valid working directory.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_ValidWorkingDirectory_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         DirectoryInfo workingDirectory = new DirectoryInfo(Path.GetTempPath());
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, workingDirectory: workingDirectory, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), workingDirectory: workingDirectory, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -465,7 +465,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync throws TaskCanceledException when cancellation is requested.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_CancellationRequested_ThrowsTaskCanceledException()
     {
         // Arrange
@@ -481,13 +481,13 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles default cancellation token.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_DefaultCancellationToken_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, cancellationToken: default);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), cancellationToken: default);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -495,7 +495,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync invokes standardErrorAction delegate when provided.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithStandardErrorAction_ExecutesSuccessfully()
     {
         // Arrange
@@ -507,7 +507,7 @@ public sealed partial class ProcessRunnerTests
         }
 
         // Act
-        await ProcessRunner.ExecuteProcessAsync(exePath, standardErrorAction: StandardErrorAction, cancellationToken: TestContext.Current.CancellationToken);
+        await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), standardErrorAction: StandardErrorAction, cancellationToken: TestContext.Current.CancellationToken);
     // Assert - delegate may or may not be invoked depending on whether there's error output
     // Just verify execution completes
     }
@@ -515,7 +515,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync invokes verboseAction delegate when provided.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithVerboseAction_ExecutesSuccessfully()
     {
         // Arrange
@@ -527,7 +527,7 @@ public sealed partial class ProcessRunnerTests
         }
 
         // Act
-        await ProcessRunner.ExecuteProcessAsync(exePath, verboseAction: VerboseAction, cancellationToken: TestContext.Current.CancellationToken);
+        await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), verboseAction: VerboseAction, cancellationToken: TestContext.Current.CancellationToken);
     // Assert - delegate may or may not be invoked
     // Just verify execution completes
     }
@@ -535,7 +535,7 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync invokes debugAction delegate when provided.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_WithDebugAction_ExecutesSuccessfully()
     {
         // Arrange
@@ -547,7 +547,7 @@ public sealed partial class ProcessRunnerTests
         }
 
         // Act
-        await ProcessRunner.ExecuteProcessAsync(exePath, debugAction: DebugAction, cancellationToken: TestContext.Current.CancellationToken);
+        await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), debugAction: DebugAction, cancellationToken: TestContext.Current.CancellationToken);
     // Assert - delegate may or may not be invoked
     // Just verify execution completes
     }
@@ -555,13 +555,13 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync handles all optional parameters as null.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_AllOptionalParametersNull_ExecutesSuccessfully()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: null, standardOutLog: null, standardErrorAction: null, toolAction: null, verboseAction: null, environmentVariables: null, debugAction: null, workingDirectory: null, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), standardOutLog: null, standardErrorAction: null, toolAction: null, verboseAction: null, environmentVariables: null, debugAction: null, workingDirectory: null, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
     }
@@ -569,13 +569,13 @@ public sealed partial class ProcessRunnerTests
     /// <summary>
     /// Tests that ExecuteProcessAsync returns ExitCode with appropriate code value.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ExecuteProcessAsync_ValidExecution_ReturnsExitCode()
     {
         // Arrange
         string exePath = GetSystemExecutable();
         // Act
-        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, cancellationToken: TestContext.Current.CancellationToken);
+        ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), cancellationToken: TestContext.Current.CancellationToken);
         // Assert
         exitCode.Should().NotBeNull();
         exitCode.Code.Should().BeGreaterThanOrEqualTo(0);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -10,7 +10,7 @@ namespace Arbor.Processing.Tests.Integration;
 
 public class ProcessTests(ITestOutputHelper output)
 {
-    [Fact]
+    [Fact(Timeout = 30_000)]
     public async Task InfiniteProcessShouldBeCleanedUpOnCancellation()
     {
         string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
@@ -51,7 +51,7 @@ public class ProcessTests(ITestOutputHelper output)
         exitCode.Should().BeNull();
     }
 
-    [Fact]
+    [Fact(Timeout = 30_000)]
     public async Task InfiniteProcessShouldBeCleanedUpOnCancellationWithoutLogging()
     {
         string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
@@ -76,7 +76,7 @@ public class ProcessTests(ITestOutputHelper output)
         exitCode.Should().BeNull();
     }
 
-    [Fact]
+    [Fact(Timeout = 10_000)]
     public async Task ProcessPassingEnvironmentVariables()
     {
         string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
@@ -106,7 +106,7 @@ public class ProcessTests(ITestOutputHelper output)
     }
 
 
-    [Fact]
+    [Fact(Timeout = 120_000)]
     public async Task ProcessShouldBeCleanedUpOnExitSuccessful()
     {
         string exePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),

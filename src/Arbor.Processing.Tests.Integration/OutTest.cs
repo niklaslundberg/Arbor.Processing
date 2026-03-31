@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using AwesomeAssertions;
@@ -8,7 +8,7 @@ namespace Arbor.Processing.Tests.Integration;
 
 public class OutTest(ITestOutputHelper testOutputHelper)
 {
-    [Fact]
+    [Fact(Timeout = 30_000)]
     public async Task Output()
     {
 #if DEBUG
