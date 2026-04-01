@@ -23,7 +23,7 @@ public class ProcessTests(ITestOutputHelper output)
 
         Func<Task> act = async () =>
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
             exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                 args,
                 standardOutLog: (m, c) =>
@@ -33,7 +33,7 @@ public class ProcessTests(ITestOutputHelper output)
                         output.WriteLine($"{c} [StandardOut]: {m}");
                     }
                 },
-                standardErrorAction: (m, c) => output.WriteLine(c + " [StandardErrorOut]: " + m),
+                standardErrorAction: (m, c) => output.WriteLine($"{c} [StandardErrorOut]: {m}"),
                 toolAction: (m, c) =>
                 {
                     if (!string.IsNullOrWhiteSpace(m))
@@ -65,7 +65,7 @@ public class ProcessTests(ITestOutputHelper output)
 
         var action = async () =>
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
             exitCode = await ProcessRunner.ExecuteProcessAsync(exePath,
                 args,
                 noWindow: false,
@@ -119,7 +119,7 @@ public class ProcessTests(ITestOutputHelper output)
         {
             ExitCode? exitCode;
 
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
             {
                 exitCode = await ProcessRunner.ExecuteProcessAsync(
                     exePath,

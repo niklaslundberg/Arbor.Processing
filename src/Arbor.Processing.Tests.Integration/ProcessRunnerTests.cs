@@ -42,7 +42,7 @@ public sealed partial class ProcessRunnerTests
         ExitCode result = await ProcessRunner.ExecuteProcessAsync(exePath, args, verboseAction: (m, c) =>
         {
             verboseLogCalled = m.Contains("Dispose completed") || verboseLogCalled;
-        }, standardErrorAction: (m, c) =>
+        }, standardErrorAction: (_, _) =>
         {
             standardErrorCalled = true;
         }, formatArgs: false, cancellationToken: TestContext.Current.CancellationToken);
@@ -282,7 +282,7 @@ public sealed partial class ProcessRunnerTests
         // Arrange
         string exePath = GetSystemExecutable();
         bool delegateInvoked = false;
-        List<string> messages = new List<string>();
+        var messages = new List<string>();
         void StandardOutLog(string message, string category)
         {
             delegateInvoked = true;
@@ -455,7 +455,7 @@ public sealed partial class ProcessRunnerTests
     {
         // Arrange
         string exePath = GetSystemExecutable();
-        DirectoryInfo workingDirectory = new DirectoryInfo(Path.GetTempPath());
+        var workingDirectory = new DirectoryInfo(Path.GetTempPath());
         // Act
         ExitCode exitCode = await ProcessRunner.ExecuteProcessAsync(exePath, arguments: GetTestArguments(), workingDirectory: workingDirectory, cancellationToken: TestContext.Current.CancellationToken);
         // Assert
