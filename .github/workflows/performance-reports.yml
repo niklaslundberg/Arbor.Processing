@@ -22,6 +22,9 @@ jobs:
       - name: Restore
         run: dotnet restore src/Arbor.Processing.sln /p:RestoreIgnoreFailedSources=true
 
+      - name: Build
+        run: dotnet build src/Arbor.Processing.sln -c Release --no-restore
+
       - name: Test
         run: dotnet test src/Arbor.Processing.Tests.Integration/Arbor.Processing.Tests.Integration.csproj -c Release --no-restore /p:RestoreIgnoreFailedSources=true --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
 
