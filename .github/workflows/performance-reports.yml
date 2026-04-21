@@ -1,0 +1,134 @@
+name: Performance Reports
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  public-api-performance:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore src/Arbor.Processing.sln /p:RestoreIgnoreFailedSources=true
+
+      - name: Test
+        run: dotnet test src/Arbor.Processing.Tests.Integration/Arbor.Processing.Tests.Integration.csproj -c Release --no-restore /p:RestoreIgnoreFailedSources=true --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
+
+      - name: Benchmark public APIs
+        run: dotnet run --project src/Arbor.Processing.Benchmarks/Arbor.Processing.Benchmarks.csproj -c Release --no-restore -- --exporters markdown
+
+      - name: Create markdown reports
+        id: reports
+        shell: pwsh
+        run: |
+          $reportsDir = Join-Path $env:GITHUB_WORKSPACE "artifacts/reports"
+          New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
+
+          $trxFile = Get-ChildItem -Path (Join-Path $env:GITHUB_WORKSPACE "artifacts/test-results") -Recurse -Filter "*.trx" | Select-Object -First 1
+          $testReportPath = Join-Path $reportsDir "tests-report.md"
+
+          if ($null -ne $trxFile) {
+            [xml]$trx = Get-Content $trxFile.FullName
+            $counters = $trx.TestRun.ResultSummary.Counters
+            @"
+          | Metric | Value |
+          |---|---|
+          | Total | $($counters.total) |
+          | Executed | $($counters.executed) |
+          | Passed | $($counters.passed) |
+          | Failed | $($counters.failed) |
+          | Error | $($counters.error) |
+          | Timeout | $($counters.timeout) |
+          | Aborted | $($counters.aborted) |
+          "@ | Set-Content -Path $testReportPath -Encoding utf8
+          }
+          else {
+            "No TRX test report was generated." | Set-Content -Path $testReportPath -Encoding utf8
+          }
+
+          $benchmarkReportPath = Join-Path $reportsDir "benchmark-report.md"
+          $benchmarkSource = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Recurse -Filter "*.md" |
+            Where-Object { $_.FullName -match "BenchmarkDotNet\.Artifacts[\\/]+results" } |
+            Select-Object -First 1
+
+          if ($null -ne $benchmarkSource) {
+            Get-Content $benchmarkSource.FullName -Raw | Set-Content -Path $benchmarkReportPath -Encoding utf8
+          }
+          else {
+            "No benchmark markdown report was generated." | Set-Content -Path $benchmarkReportPath -Encoding utf8
+          }
+
+          $combinedReportPath = Join-Path $reportsDir "public-api-performance-report.md"
+          $testsMarkdown = Get-Content $testReportPath -Raw
+          $benchmarksMarkdown = Get-Content $benchmarkReportPath -Raw
+
+          @"
+          # Public API Performance Report
+
+          ## Test Summary
+          $testsMarkdown
+
+          ## Benchmark Summary
+          $benchmarksMarkdown
+          "@ | Set-Content -Path $combinedReportPath -Encoding utf8
+
+          Get-Content $combinedReportPath -Raw | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          "combined-report=$combinedReportPath" >> $env:GITHUB_OUTPUT
+
+      - name: Upload markdown reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-api-performance-reports
+          path: artifacts/reports/*.md
+
+      - name: Publish report in PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          REPORT_PATH: ${{ steps.reports.outputs.combined-report }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- arbor-processing-performance-report -->';
+            const reportBody = fs.readFileSync(process.env.REPORT_PATH, 'utf8');
+            const body = `${marker}\n${reportBody}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+
+            const existing = comments.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
