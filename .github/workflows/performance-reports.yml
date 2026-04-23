@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   public-api-performance:
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
 
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore src/Arbor.Processing.sln /p:RestoreIgnoreFailedSources=true
+        run: dotnet restore src/Arbor.Processing.sln --locked-mode /p:RestoreIgnoreFailedSources=true
 
       - name: Build
         run: dotnet build src/Arbor.Processing.sln -c Release --no-restore
