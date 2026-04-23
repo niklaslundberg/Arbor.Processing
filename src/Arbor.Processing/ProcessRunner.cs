@@ -917,7 +917,7 @@ public sealed class ProcessRunner : IDisposable
 
         var processStopWatch = Stopwatch.StartNew();
 
-        string[] args = arguments?.ToArray() ?? [];
+        string[] args = arguments as string[] ?? arguments?.ToArray() ?? [];
 
         try
         {
@@ -943,10 +943,15 @@ public sealed class ProcessRunner : IDisposable
         {
             processStopWatch.Stop();
 
-            string processWithArgs = $"\"{executePath}\" {string.Join(" ", args.Select(arg => $"\"{arg}\""))}";
-            toolAction?.Invoke(
-                $"Running process {processWithArgs} took {processStopWatch.Elapsed.TotalMilliseconds:F1} milliseconds",
-                ProcessRunnerName);
+            if (toolAction is { })
+            {
+                string processWithArgs = args.Length > 0
+                    ? $"\"{executePath}\" {string.Join(" ", args.Select(arg => $"\"{arg}\""))}"
+                    : $"\"{executePath}\"";
+                toolAction(
+                    $"Running process {processWithArgs} took {processStopWatch.Elapsed.TotalMilliseconds:F1} milliseconds",
+                    ProcessRunnerName);
+            }
         }
 
 

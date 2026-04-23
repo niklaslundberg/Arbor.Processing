@@ -1,0 +1,9 @@
+﻿namespace Arbor.Processing.Benchmarks;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        BenchmarkDotNet.Running.BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+    }
+}

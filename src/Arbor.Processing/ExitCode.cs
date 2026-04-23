@@ -2,7 +2,7 @@
 
 namespace Arbor.Processing;
 
-public struct ExitCode(int code) : IEquatable<ExitCode>
+public readonly struct ExitCode(int code) : IEquatable<ExitCode>
 {
     public bool Equals(ExitCode other) => Code == other.Code;
 
@@ -33,13 +33,13 @@ public struct ExitCode(int code) : IEquatable<ExitCode>
         return $"EXIT CODE [{Code}] {message}";
     }
 
-    private static readonly Lazy<ExitCode> LazySuccess = new(() => new ExitCode(0));
+    private static readonly ExitCode SuccessValue = new(0);
 
-    private static readonly Lazy<ExitCode> LazyFailure = new(() => new ExitCode(1));
+    private static readonly ExitCode FailureValue = new(1);
 
-    public static ExitCode Success => LazySuccess.Value;
+    public static ExitCode Success => SuccessValue;
 
-    public static ExitCode Failure => LazyFailure.Value;
+    public static ExitCode Failure => FailureValue;
 
     public static ExitCode Failed(int exitCode)
     {
